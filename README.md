@@ -20,8 +20,10 @@ gcc rfid_donnees_gui.c -o rfid_tags.exe -lwinscard -lcomdlg32 -mwindows
 
 # Lancer l'application
 ./rfid_tags.exe
+```
 
 ## Flux de données
+```bash
 Fichier (CSV ou Excel) → RAM (CsvData)
                               ↓
                       Choix du Mode (Auto/Manuel/Lecture)
@@ -30,7 +32,7 @@ Fichier (CSV ou Excel) → RAM (CsvData)
                               ↓
                      Puce RFID (Requêtes APDU)
 
- 
+ ```
 ## Architecture Globale du Code (à lire avant de plonger dans le code) :
 
 - Traitement de Données (CSV/Excel) : Le programme gère l'import natif de fichiers texte et fait appel à un script VBScript généré à la volée pour piloter de manière invisible (OLE Automation) l'extraction d'un fichier Excel en CSV.
