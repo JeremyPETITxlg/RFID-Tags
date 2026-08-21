@@ -1,44 +1,54 @@
-# RFID-Tags
+# RFID-NFC-QR-Toolkit
 
-Application Windows avec interface graphique permettant d'utiliser le lecteur "ACR122U" pour lire ou écrire via des listes Excel ou CSV sur des puces RFID.
+Application Windows native (C / Win32) dédiée à l'automatisation de la traçabilité matérielle. L'outil permet d'encoder par lots des puces RFID/NFC (norme NTAG) et de générer simultanément des étiquettes QR Code au format PNG à partir de listes Excel ou CSV.
 
-## Matériel
+## Matériel & Compatibilité
 
-- **OS cible** : Windows (utilisation native de l'API Win32 pour l'interface graphique).
-- **Lecteur RFID** : ACR122U.
-- **Tags supportés** : Puces RFID (norme NTAG).
-- **API Matérielle** : Protocole PC/SC via la librairie `winscard`.
-- **Dépendances externes** : Microsoft Excel (requis en arrière-plan pour l'extraction via script VBScript).
+- **OS cible** : Windows 10 / 11 (GUI native Win32 sans framework lourd).
+- **Lecteurs RFID/NFC** : Tout lecteur compatible PC/SC (testé et optimisé sur ACR122U).
+- **Puces supportées** : Famille NTAG (NTAG213, NTAG215, NTAG216, etc.) via commandes APDU standardisées.
+- **Dépendances bureautiques** : Microsoft Excel (requis uniquement pour l'extraction automatique via VBScript).
+## Fonctionnalités Clés
+  - Mode Automatique : Déroulement séquentiel du fichier source avec reprise sur incident (persistance dans state.txt).
+
+  - Mode Hybride : Possibilité d'encoder la puce RFID, de générer le QR Code, ou de réaliser les deux opérations simultanément.
+
+  - Mode Clonage / Conversion : Lecture d'une puce RFID physique et génération instantanée du QR Code équivalent.
+
+  - Étiquetage Visuel : Incrustation automatique de l'URL lisible par un opérateur sous l'image du QR Code généré.
+## Bibliothèques & Dépendances
+
+Le projet a été conçu pour être **100 % autonome et portable**, sans installateur lourd ni gestionnaire de paquets complexe :
+
+- **`windows.h` & `commdlg.h`** : Gestion native de l'interface graphique Win32, du multithreading et des boîtes de dialogue de sélection de fichiers.
+- **`winscard.h` (`winscard.lib`)** : API standard Windows PC/SC pour la communication bas niveau et l'envoi des trames APDU aux puces sans contact.
+- **`qrcodegen.c` / `qrcodegen.h` (Projet Nayuki)** : Moteur mathématique C pur et léger pour le calcul de la matrice QR Code (ECC Low, masque automatique).
+- **`stb_image_write.h` (Sean Barrett - Header-only)** : Compression et écriture directe du tableau de pixels en fichier `.png` standard sur le disque.
+- **Police Bitmap 8x8 embarquée** : Matrice typographique intégrée directement dans le code pour dessiner l'étiquette texte sous le QR Code sans dépendre de polices système externes.
 
 ## Build
 
-Le projet est écrit en C natif. La compilation nécessite un compilateur supportant l'API Windows (comme GCC/MinGW ou MSVC) en incluant les bibliothèques système nécessaires.
+La compilation s'effectue directement via GCC (MinGW / w64devkit) :
 
 ```bash
-# Exemple de compilation avec GCC (MinGW)
-gcc rfid_donnees_gui.c -o rfid_tags.exe -lwinscard -lcomdlg32 -mwindows
+# Compilation
+gcc RFID-NFC-Tags.c qrcodegen.c -o RFID-NFC-Tags.exe -lwinscard -lcomdlg32 -mwindows
 
-# Lancer l'application
-./rfid_tags.exe
+# Exécution
+./RFID-NFC-Tags.exe
 ```
 
 ## Flux de données
 ```bash
-Fichier (CSV ou Excel) → RAM (CsvData)
-                              ↓
-                      Choix du Mode (Auto/Manuel/Lecture)
-                              ↓
-        WorkerThreadProc ↔ winscard (PC/SC) ↔ Lecteur ACR122U
-                              ↓
-                     Puce RFID (Requêtes APDU)
-
- ```
-## Architecture Globale du Code (à lire avant de plonger dans le code) :
-
-- Traitement de Données (CSV/Excel) : Le programme gère l'import natif de fichiers texte et fait appel à un script VBScript généré à la volée pour piloter de manière invisible (OLE Automation) l'extraction d'un fichier Excel en CSV.
-
-- Protocole Matériel (PC/SC) : Toute la communication bas niveau vers le lecteur RFID (type ACR122U) transite via la librairie winscard. Le code envoie des requêtes APDU brutes pour lire et écrire par blocs de 4 octets (norme NTAG).
-
-- Encodage NDEF : Il respecte la norme "NFC Forum Type 2" pour formater et décoder la charge utile (payload) du tag sous forme d'URI (lien compressé).
-
-- Multithreading & Interface (Win32 API) : Pour empêcher l'interface graphique de figer pendant qu'on attend la présentation d'un badge, une fonction WorkerThreadProc tourne en arrière-plan et dialogue avec la fenêtre principale (WndProc) à l'aide de signaux de messagerie Windows (PostMessage).
+Fichier Source (CSV / Excel via VBS)  ──┐
+                                       ├─► RAM (CsvData) ──► Validation & Sélections
+Saisie Manuelle / Scan Tag RFID       ──┘
+                                                                │
+                                   ┌────────────────────────────┴────────────────────────────┐
+                                   ▼                                                         ▼
+                      [ Export QR Code ]                                        [ Export RFID / NFC ]
+                                   │                                                         │
+                        qrcodegen + stb_image                                     Requêtes APDU (winscard)
+                                   │                                                         │
+                      Fichier PNG avec étiquette                                Puce physique NTAG 
+```
